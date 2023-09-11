@@ -83,6 +83,9 @@ class MainWindow(QWidget, Ui_MainWindow):
         self.button3.clicked.connect(self.button3Clicked)
         buttonLayout.addWidget(self.button3)
 
+        self.overwriteCheckbox = QCheckBox('Overwrite original images', self)
+        buttonLayout.addWidget(self.overwriteCheckbox)
+
         buttonWidget = QWidget()
         buttonWidget.setLayout(buttonLayout)
         mainLayout.addWidget(buttonWidget)
@@ -153,10 +156,6 @@ class MainWindow(QWidget, Ui_MainWindow):
 
             h_img, w_img, _ = img.shape
 
-            dst = img[
-                int(h_img - (h_img * ratio)) : h_img,
-                int(w_img - (w_img * ratio)) : w_img,
-            ]
 
             if np.mean(dst) / 255 > 0.4:
                 logo = self.kor_pngread(black)
@@ -165,12 +164,18 @@ class MainWindow(QWidget, Ui_MainWindow):
 
             h_logo, w_logo, _ = logo.shape
 
+            min_dim = min(h_img, w_img)
             logo = cv2.resize(
                 logo,
-                (int(w_img * ratio), int(w_img * ratio * h_logo / w_logo)),
+                (int(min_dim * ratio), int(min_dim * ratio * h_logo / w_logo)),
                 interpolation=cv2.INTER_CUBIC,
             )
             h_logo, w_logo, _ = logo.shape
+
+            dst = img[
+                int(h_img - h_logo) : h_img,
+                int(w_img - w_logo) : w_img,
+            ]
 
             alpha = logo[:, :, 3]
             rgb = logo[:, :, :3]
@@ -203,8 +208,14 @@ class MainWindow(QWidget, Ui_MainWindow):
 
             result_image = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
 
-            with open(item, "wb") as f:
-                result_image.save(f, **info)
+            if self.overwriteCheckbox.isChecked():
+                # Overwrite the original image
+                with open(item, "wb") as f:
+                    result_image.save(f, **info)
+            else:
+                # Save as a new file
+                with open(item + "_watermarked.jpg", "wb") as f:
+                    result_image.save(f, **info)
 
 
 if __name__ == "__main__":
