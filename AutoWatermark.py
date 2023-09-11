@@ -75,16 +75,16 @@ class MainWindow(QWidget, Ui_MainWindow):
         self.watermarkSizeInput = QDoubleSpinBox(self)
         self.watermarkSizeInput.setRange(0, 1)
         self.watermarkSizeInput.setSingleStep(0.01)
-        self.watermarkSizeInput.setValue(0.08)
+        self.watermarkSizeInput.setValue(0.18)
         self.watermarkSizeInput.setToolTip("Watermark size ratio (0 to 1)")
         buttonLayout.addWidget(self.watermarkSizeInput)
+
+        self.overwriteCheckbox = QCheckBox("Overwrite", self)
+        buttonLayout.addWidget(self.overwriteCheckbox)
 
         self.button3 = QPushButton("Apply!", self)
         self.button3.clicked.connect(self.button3Clicked)
         buttonLayout.addWidget(self.button3)
-
-        self.overwriteCheckbox = QCheckBox('Overwrite original images', self)
-        buttonLayout.addWidget(self.overwriteCheckbox)
 
         buttonWidget = QWidget()
         buttonWidget.setLayout(buttonLayout)
@@ -143,6 +143,16 @@ class MainWindow(QWidget, Ui_MainWindow):
 
         row, col = position
 
+        white_logo = self.kor_pngread(white)
+        black_logo = self.kor_pngread(black)
+        try:
+            assert white_logo.shape[:2] == black_logo.shape[:2]
+        except AssertionError:
+            self.text.append(
+                "Size of white and black watermark is different! Please try again."
+            )
+            return
+
         for item in image:
             item = item.replace("\\", "/").replace("\\\\", "/")
             with open(item, "rb") as f:
@@ -155,14 +165,17 @@ class MainWindow(QWidget, Ui_MainWindow):
                 continue
 
             h_img, w_img, _ = img.shape
+            h_logo, w_logo, _ = white_logo.shape
 
+            dst = img[
+                int(h_img - h_logo) : h_img,
+                int(w_img - w_logo) : w_img,
+            ]
 
-            if np.mean(dst) / 255 > 0.4:
-                logo = self.kor_pngread(black)
+            if np.mean(dst) / 255 < 0.4:
+                logo = white_logo
             else:
-                logo = self.kor_pngread(white)
-
-            h_logo, w_logo, _ = logo.shape
+                logo = black_logo
 
             min_dim = min(h_img, w_img)
             logo = cv2.resize(
@@ -171,11 +184,6 @@ class MainWindow(QWidget, Ui_MainWindow):
                 interpolation=cv2.INTER_CUBIC,
             )
             h_logo, w_logo, _ = logo.shape
-
-            dst = img[
-                int(h_img - h_logo) : h_img,
-                int(w_img - w_logo) : w_img,
-            ]
 
             alpha = logo[:, :, 3]
             rgb = logo[:, :, :3]
@@ -214,7 +222,15 @@ class MainWindow(QWidget, Ui_MainWindow):
                     result_image.save(f, **info)
             else:
                 # Save as a new file
-                with open(item + "_watermarked.jpg", "wb") as f:
+                new_dir = os.path.dirname(item) + "/Modified"
+                if not os.path.exists(new_dir):
+                    os.makedirs(new_dir)
+
+                filename = os.path.basename(item)
+                new_file_path = os.path.join(
+                    new_dir, filename[:-4] + "_watermarked.jpg"
+                )
+                with open(new_file_path, "wb") as f:
                     result_image.save(f, **info)
 
 
