@@ -1,8 +1,26 @@
+"""
+=============================== AutoWatermark Application ===============================
+
+This application allows users to apply watermarks to a batch of images.
+Users can select images, choose a white and a black watermark, and apply
+these watermarks to the images based on the image's brightness automatically.
+
+How to Use:
+1. Drag and drop images or click and select an image folder using the 'Input images' button.
+2. Drag and drop or click and select a white watermark PNG file using the 'White watermark' button.
+3. Drag and drop or click and select a black watermark PNG file using the 'Black watermark' button.
+4. Choose the watermark position and size.
+5. Click 'Apply!' to process the images.
+6. Processed images will be saved in a 'Modified' folder or overwrited on the original images.
+=========================================================================================
+"""
+
 import cv2, os, sys
 import numpy as np
 from glob import glob
 import PyQt5
 from PyQt5.QtWidgets import *
+from PyQt5.QtCore import Qt
 from PyQt5 import uic
 from PIL import Image
 
@@ -14,6 +32,40 @@ def resource_path(relative_path):
 
 main_ui = resource_path("AutoWatermark.ui")
 Ui_MainWindow = uic.loadUiType(main_ui)[0]
+
+
+class Button(QPushButton):
+    def __init__(
+        self, title, fileTypes, drop_callback, clicked_callback, batch=True, parent=None
+    ):
+        super().__init__(title, parent)
+        self.fileTypes = fileTypes
+        self.callback = drop_callback
+        # self.setAlignment(Qt.AlignCenter)
+        # self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.setText(title)
+        self.setAcceptDrops(True)
+        self.clicked.connect(clicked_callback)
+        self.batch = batch
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            # and all(
+            #     url.toLocalFile().endswith(self.fileTypes)
+            #     for url in event.mimeData().urls()
+            # ):
+            event.accept()
+            self.setStyleSheet("background-color: lightgreen;")
+        else:
+            event.ignore()
+
+    def dragLeaveEvent(self, event):
+        self.setStyleSheet("")
+
+    def dropEvent(self, event):
+        self.setStyleSheet("")
+        files = [url.toLocalFile() for url in event.mimeData().urls()]
+        self.callback(files)
 
 
 class MainWindow(QWidget, Ui_MainWindow):
@@ -60,16 +112,34 @@ class MainWindow(QWidget, Ui_MainWindow):
 
         buttonLayout = QHBoxLayout()
 
-        self.button0 = QPushButton("Select JPG images folder", self)
-        self.button0.clicked.connect(self.button0Clicked)
+        self.button0 = Button(
+            "Input images",
+            [".jpg", ".jpeg", ".JPG", "JPEG"],
+            self.addImages,
+            self.button0Clicked,
+            True,
+            self,
+        )
         buttonLayout.addWidget(self.button0)
 
-        self.button1 = QPushButton("Select white watermark PNG", self)
-        self.button1.clicked.connect(self.button1Clicked)
+        self.button1 = Button(
+            "White watermark",
+            [".png", ".PNG"],
+            self.addWhiteWatermark,
+            self.button1Clicked,
+            False,
+            self,
+        )
         buttonLayout.addWidget(self.button1)
 
-        self.button2 = QPushButton("Select black watermark PNG", self)
-        self.button2.clicked.connect(self.button2Clicked)
+        self.button2 = Button(
+            "Black watermark",
+            [".png", ".PNG"],
+            self.addBlackWatermark,
+            self.button2Clicked,
+            False,
+            self,
+        )
         buttonLayout.addWidget(self.button2)
 
         self.watermarkSizeInput = QDoubleSpinBox(self)
@@ -89,7 +159,55 @@ class MainWindow(QWidget, Ui_MainWindow):
         buttonWidget = QWidget()
         buttonWidget.setLayout(buttonLayout)
         mainLayout.addWidget(buttonWidget)
+
         self.setLayout(mainLayout)
+
+        self.setAcceptDrops(True)
+
+        self.text.append(__doc__)
+
+    def addImages(self, files):
+        self.images = []
+        if os.path.isdir(files[0]):
+            self.addImagesFromDirectory(files[0])
+        else:
+            for file in files:
+                if os.path.isfile(file) and file.lower().endswith(
+                    (".jpg", ".jpeg", ".png")
+                ):
+                    self.images.append(file)
+            self.updateImageListDisplay()
+
+    def addWhiteWatermark(self, files):
+        self.white = None
+        if files and files[0].endswith((".png", ".PNG")):
+            self.white = files[0]
+            self.text.append(f"White watermark selected: {self.white}")
+        else:
+            self.text.append(
+                "White watermark import failed. Only PNG format is allowed."
+            )
+
+    def addBlackWatermark(self, files):
+        self.black = None
+        if files and files[0].endswith((".png", ".PNG")):
+            self.black = files[0]
+            self.text.append(f"Black watermark selected: {self.black}")
+        else:
+            self.text.append(
+                "Black watermark import failed. Only PNG format is allowed."
+            )
+
+    def addImagesFromDirectory(self, directory):
+        for ext in ("*/.jpg", "/*.jpeg", "/*.JPG", "/*.JPEG"):
+            self.images.extend(glob(os.path.join(directory, ext)))
+        self.text.append(f"JPG folder selected: {directory}")
+
+    def updateImageListDisplay(self):
+        # self.text.clear()
+        self.text.append("Images to process:")
+        for img in self.images:
+            self.text.append(img)
 
     def get_position(self):
         for row in range(3):
@@ -100,15 +218,12 @@ class MainWindow(QWidget, Ui_MainWindow):
         return None
 
     def button0Clicked(self):
+        self.images = []
         fname = QFileDialog.getExistingDirectory(self, "Select Folder", "")
-        self.images = glob(f"{fname}/*.jpg")
-        self.images = glob(f"{fname}/*.jpeg") + self.images
-        self.images = glob(f"{fname}/*.JPG") + self.images
-        self.images = glob(f"{fname}/*.JPEG") + self.images
-        print(self.images)
-        self.text.append(f"JPG folder selected: {fname}")
+        self.addImagesFromDirectory(fname)
 
     def button1Clicked(self):
+        self.white = None
         fname = QFileDialog.getOpenFileName(
             self, "Select White Watermark", "", "PNG Files (*.png)"
         )
@@ -116,6 +231,7 @@ class MainWindow(QWidget, Ui_MainWindow):
         self.text.append(f"White watermark selected: {fname[0]}")
 
     def button2Clicked(self):
+        self.black = None
         fname = QFileDialog.getOpenFileName(
             self, "Select Black Watermark", "", "PNG Files (*.png)"
         )
@@ -227,9 +343,7 @@ class MainWindow(QWidget, Ui_MainWindow):
                     os.makedirs(new_dir)
 
                 filename = os.path.basename(item)
-                new_file_path = os.path.join(
-                    new_dir, filename[:-4] + "_watermarked.jpg"
-                )
+                new_file_path = os.path.join(new_dir, filename)
                 with open(new_file_path, "wb") as f:
                     result_image.save(f, **info)
 
