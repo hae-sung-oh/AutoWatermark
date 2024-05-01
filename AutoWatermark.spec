@@ -5,7 +5,7 @@ a = Analysis(
     ['AutoWatermark.py'],
     pathex=[],
     binaries=[],
-    datas=[('AutoWatermark.ui', './')],
+    datas=[],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

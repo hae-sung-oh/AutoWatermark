@@ -25,13 +25,13 @@ from PyQt5 import uic
 from PIL import Image
 
 
-def resource_path(relative_path):
-    base_path = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(base_path, relative_path)
+# def resource_path(relative_path):
+#     base_path = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+#     return os.path.join(base_path, relative_path)
 
 
-main_ui = resource_path("AutoWatermark.ui")
-Ui_MainWindow = uic.loadUiType(main_ui)[0]
+# main_ui = resource_path("AutoWatermark.ui")
+# Ui_MainWindow = uic.loadUiType(main_ui)[0]
 
 
 class Button(QPushButton):
@@ -68,7 +68,7 @@ class Button(QPushButton):
         self.callback(files)
 
 
-class MainWindow(QWidget, Ui_MainWindow):
+class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.initUI()
@@ -79,7 +79,7 @@ class MainWindow(QWidget, Ui_MainWindow):
         self.white = None
         self.black = None
 
-        self.resize(900, 300)
+        self.resize(900, 400)
 
         mainLayout = QVBoxLayout()
 
